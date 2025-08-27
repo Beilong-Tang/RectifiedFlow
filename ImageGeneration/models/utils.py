@@ -86,7 +86,7 @@ def get_ddpm_params(config):
   }
 
 
-def create_model(config):
+def create_model(config, data_parallel=True):
   """Create the score model."""
   model_name = config.model.name
   score_model = get_model(model_name)(config)
@@ -97,7 +97,8 @@ def create_model(config):
       num_params += p.numel()
   print('Number of Parameters in the Score Model:', num_params)
 
-  score_model = torch.nn.DataParallel(score_model)
+  if data_parallel is True:
+    score_model = torch.nn.DataParallel(score_model)
   return score_model
 
 

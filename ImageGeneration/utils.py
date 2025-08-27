@@ -19,10 +19,10 @@ def restore_checkpoint(ckpt_dir, state, device):
     return state
 
 
-def save_checkpoint(ckpt_dir, state):
+def save_checkpoint(ckpt_dir, state, ddp = False):
   saved_state = {
     'optimizer': state['optimizer'].state_dict(),
-    'model': state['model'].state_dict(),
+    'model': state['model'].state_dict() if not ddp else state['model'].module.state_dict(),
     'ema': state['ema'].state_dict(),
     'step': state['step']
   }

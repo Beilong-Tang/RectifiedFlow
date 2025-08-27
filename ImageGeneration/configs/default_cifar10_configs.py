@@ -51,6 +51,7 @@ def get_default_configs():
   data.centered = False
   data.uniform_dequantization = False
   data.num_channels = 3
+  data.num_workers = 4
 
   # model
   config.model = model = ml_collections.ConfigDict()
@@ -73,6 +74,6 @@ def get_default_configs():
   optim.grad_clip = 1.
 
   config.seed = 42
-  config.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+  config.device = 'cuda'
 
   return config
