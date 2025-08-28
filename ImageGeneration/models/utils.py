@@ -98,6 +98,7 @@ def create_model(config, data_parallel=True):
   print('Number of Parameters in the Score Model:', num_params)
 
   if data_parallel is True:
+    print("WARNING! DATA PARRLE IS ENABLED. BUT THIS IS NOT OPTIMZED, SHOULD USE DDP!")
     score_model = torch.nn.DataParallel(score_model)
   return score_model
 
