@@ -68,7 +68,7 @@ def train(config, workdir):
   os.makedirs(sample_dir, exist_ok=True)
 
   tb_dir = os.path.join(workdir, "tensorboard")
-  os.makedirs(tb_dir)
+  os.makedirs(tb_dir, exist_ok=True)
   writer = tensorboard.SummaryWriter(tb_dir)
 
   # Initialize model.
