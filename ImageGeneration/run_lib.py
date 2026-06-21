@@ -33,7 +33,7 @@ import sampling
 from models import utils as mutils
 from models.ema import ExponentialMovingAverage
 import datasets
-import evaluation
+# import evaluation
 import likelihood
 import sde_lib
 from absl import flags
