@@ -21,9 +21,8 @@ import run_lib_pytorch
 from absl import app
 from absl import flags
 from ml_collections.config_flags import config_flags
-import logging
 import os
-import tensorflow as tf
+# import tensorflow as tf
 
 FLAGS = flags.FLAGS
 
@@ -39,21 +38,21 @@ flags.mark_flags_as_required(["workdir", "config", "mode"])
 def main(argv):
   if FLAGS.mode == "train":
     # Create the working directory
-    tf.io.gfile.makedirs(FLAGS.workdir)
+    os.makedirs(FLAGS.workdir, exist_ok=True)
     # Set logger so that it outputs to both console and file
     # Make logging work for both disk and Google Cloud Storage
-    gfile_stream = open(os.path.join(FLAGS.workdir, 'stdout.txt'), 'w')
-    handler = logging.StreamHandler(gfile_stream)
-    formatter = logging.Formatter('%(levelname)s - %(filename)s - %(asctime)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger = logging.getLogger()
-    logger.addHandler(handler)
-    logger.setLevel('INFO')
+    # gfile_stream = open(os.path.join(FLAGS.workdir, 'stdout.txt'), 'w')
+    # handler = logging.StreamHandler(gfile_stream)
+    # formatter = logging.Formatter('%(levelname)s - %(filename)s - %(asctime)s - %(message)s')
+    # handler.setFormatter(formatter)
+    # logger = logging.getLogger()
+    # logger.addHandler(handler)
+    # logger.setLevel('INFO')
     # Run the training pipeline
-    if 'pytorch' in FLAGS.config.data.dataset.lower():
-        run_lib_pytorch.train(FLAGS.config, FLAGS.workdir)
-    else:
-        run_lib.train(FLAGS.config, FLAGS.workdir)
+    # if 'pytorch' in FLAGS.config.data.dataset.lower():
+    #     run_lib_pytorch.train(FLAGS.config, FLAGS.workdir)
+    # else:
+    run_lib.train(FLAGS.config, FLAGS.workdir)
   elif FLAGS.mode == "eval":
     # Run the evaluation pipeline
     if 'pytorch' in FLAGS.config.data.dataset.lower():
@@ -67,7 +66,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-  gpus = tf.config.experimental.list_physical_devices('GPU')
-  for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
   app.run(main)

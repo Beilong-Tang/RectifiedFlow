@@ -22,8 +22,9 @@ import os
 import time
 
 import numpy as np
-import tensorflow as tf
-import tensorflow_gan as tfgan
+# import tensorflow as tf
+# import tensorflow_gan as tfgan
+from datetime import timedelta
 import logging
 # Keep the import below for registering all model definitions
 from models import ddpm, ncsnv2, ncsnpp
@@ -43,6 +44,15 @@ from utils import save_checkpoint, restore_checkpoint
 
 FLAGS = flags.FLAGS
 
+def time_to_str(time):
+    return str(timedelta(seconds=int(time)))
+
+def infiniteloop(dataloader):
+    while True:
+        for x, y in iter(dataloader):
+            yield x
+
+
 
 def train(config, workdir):
   """Runs the training pipeline.
@@ -55,10 +65,10 @@ def train(config, workdir):
 
   # Create directories for experimental logs
   sample_dir = os.path.join(workdir, "samples")
-  tf.io.gfile.makedirs(sample_dir)
+  os.makedirs(sample_dir, exist_ok=True)
 
   tb_dir = os.path.join(workdir, "tensorboard")
-  tf.io.gfile.makedirs(tb_dir)
+  os.makedirs(tb_dir)
   writer = tensorboard.SummaryWriter(tb_dir)
 
   # Initialize model.
@@ -71,18 +81,18 @@ def train(config, workdir):
   checkpoint_dir = os.path.join(workdir, "checkpoints")
   # Intermediate checkpoints to resume training after pre-emption in cloud environments
   checkpoint_meta_dir = os.path.join(workdir, "checkpoints-meta", "checkpoint.pth")
-  tf.io.gfile.makedirs(checkpoint_dir)
-  tf.io.gfile.makedirs(os.path.dirname(checkpoint_meta_dir))
+  os.makedirs(checkpoint_dir, exist_ok=True)
+  os.makedirs(os.path.dirname(checkpoint_meta_dir), exist_ok=True)
   # Resume training when intermediate checkpoints are detected
   state = restore_checkpoint(checkpoint_meta_dir, state, config.device)
   initial_step = int(state['step'])
 
   # Build data iterators
-  train_ds, eval_ds, _ = datasets.get_dataset(config,
+  train_ds, eval_ds = datasets.get_dataset(config,
                                               uniform_dequantization=config.data.uniform_dequantization)
 
-  train_iter = iter(train_ds)  # pytype: disable=wrong-arg-types
-  eval_iter = iter(eval_ds)  # pytype: disable=wrong-arg-types
+  train_iter = infiniteloop(train_ds)  # pytype: disable=wrong-arg-types
+  eval_iter = infiniteloop(eval_ds)  # pytype: disable=wrong-arg-types
   # Create data normalizer and its inverse
   scaler = datasets.get_data_scaler(config)
   inverse_scaler = datasets.get_data_inverse_scaler(config)
@@ -126,15 +136,18 @@ def train(config, workdir):
   # In case there are multiple hosts (e.g., TPU pods), only log to host 0
   logging.info("Starting training loop at step %d." % (initial_step,))
 
+  start_time = time.time()
   for step in range(initial_step, num_train_steps + 1):
     # Convert data to JAX arrays and normalize them. Use ._numpy() to avoid copy.
-    batch = torch.from_numpy(next(train_iter)['image']._numpy()).to(config.device).float()
-    batch = batch.permute(0, 3, 1, 2)
+    batch = next(train_iter).to(config.device).float()
     batch = scaler(batch)
     # Execute one training step
     loss = train_step_fn(state, batch)
-    if step % config.training.log_freq == 0:
-      logging.info("step: %d, training_loss: %.5e" % (step, loss.item()))
+    if step % config.training.log_freq == 0 and (step - initial_step) !=0 :
+      time_elapsed = time.time() - start_time
+      rate = time_elapsed/(step-initial_step)
+      time_left = (num_train_steps - step) * rate
+      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, [{time_to_str(time_elapsed)}<{time_to_str(time_left)}, {rate:.4f}s/it")
       writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
@@ -142,13 +155,13 @@ def train(config, workdir):
       save_checkpoint(checkpoint_meta_dir, state)
 
     # Report the loss on an evaluation dataset periodically
-    if step % config.training.eval_freq == 0:
-      eval_batch = torch.from_numpy(next(eval_iter)['image']._numpy()).to(config.device).float()
-      eval_batch = eval_batch.permute(0, 3, 1, 2)
-      eval_batch = scaler(eval_batch)
-      eval_loss = eval_step_fn(state, eval_batch)
-      logging.info("step: %d, eval_loss: %.5e" % (step, eval_loss.item()))
-      writer.add_scalar("eval_loss", eval_loss.item(), step)
+    # if step % config.training.eval_freq == 0:
+    #   eval_batch = torch.from_numpy(next(eval_iter)['image']._numpy()).to(config.device).float()
+    #   eval_batch = eval_batch.permute(0, 3, 1, 2)
+    #   eval_batch = scaler(eval_batch)
+    #   eval_loss = eval_step_fn(state, eval_batch)
+    #   logging.info("step: %d, eval_loss: %.5e" % (step, eval_loss.item()))
+    #   writer.add_scalar("eval_loss", eval_loss.item(), step)
 
     # Save a checkpoint periodically and generate samples if needed
     if step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
@@ -163,16 +176,14 @@ def train(config, workdir):
         sample, n = sampling_fn(score_model)
         ema.restore(score_model.parameters())
         this_sample_dir = os.path.join(sample_dir, "iter_{}".format(step))
-        tf.io.gfile.makedirs(this_sample_dir)
+        os.makedirs(this_sample_dir, exist_ok=True)
         nrow = int(np.sqrt(sample.shape[0]))
         image_grid = make_grid(sample, nrow, padding=2)
         sample = np.clip(sample.permute(0, 2, 3, 1).cpu().numpy() * 255, 0, 255).astype(np.uint8)
-        with tf.io.gfile.GFile(
-            os.path.join(this_sample_dir, "sample.np"), "wb") as fout:
+        with open(os.path.join(this_sample_dir, "sample.npy"), "wb") as fout:
           np.save(fout, sample)
 
-        with tf.io.gfile.GFile(
-            os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
+        with open(os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
           save_image(image_grid, fout)
 
 
