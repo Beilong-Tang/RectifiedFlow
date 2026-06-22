@@ -49,7 +49,7 @@ class ContextTimer:
         eta = str(eta)
         res = f"[{time_to_str(self.total_step_time)}<{eta}, {step_total:.3f}s/it"
         for k, v in step_times.items():
-            res += f", {k}: {v:.3f}"
+            res += f", {k}: {v:.3f}s"
         res +="]"
         return res
 
