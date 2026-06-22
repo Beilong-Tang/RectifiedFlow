@@ -147,7 +147,7 @@ def train(config, workdir):
       time_elapsed = time.time() - start_time
       rate = time_elapsed/(step-initial_step)
       time_left = (num_train_steps - step) * rate
-      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, [{time_to_str(time_elapsed)}<{time_to_str(time_left)}, {rate:.4f}s/it")
+      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, [{time_to_str(time_elapsed)}<{time_to_str(time_left)}, {rate:.4f}s/it]")
       writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
