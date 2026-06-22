@@ -45,7 +45,7 @@ from tim import ContextTimer
 
 FLAGS = flags.FLAGS
 
-def infiniteloop(dataloader):
+def infiniteloop(dataloader, is_ddp = False):
     while True:
         for x, y in iter(dataloader):
             yield x

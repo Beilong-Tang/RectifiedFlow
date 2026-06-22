@@ -32,6 +32,7 @@ flags.DEFINE_string("workdir", None, "Work directory.")
 flags.DEFINE_enum("mode", None, ["train", "eval", "reflow"], "Running mode")
 flags.DEFINE_string("eval_folder", "eval",
                     "The folder name for storing evaluation results")
+flags.DEFINE_int("num_gpus", 1, "num of gpus to use")
 flags.mark_flags_as_required(["workdir", "config", "mode"])
 
 
@@ -52,6 +53,7 @@ def main(argv):
     # if 'pytorch' in FLAGS.config.data.dataset.lower():
     #     run_lib_pytorch.train(FLAGS.config, FLAGS.workdir)
     # else:
+    
     run_lib.train(FLAGS.config, FLAGS.workdir)
   elif FLAGS.mode == "eval":
     # Run the evaluation pipeline
