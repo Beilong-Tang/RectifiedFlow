@@ -41,11 +41,9 @@ import torch
 from torch.utils import tensorboard
 from torchvision.utils import make_grid, save_image
 from utils import save_checkpoint, restore_checkpoint
+from tim import ContextTimer
 
 FLAGS = flags.FLAGS
-
-def time_to_str(time):
-    return str(timedelta(seconds=int(time)))
 
 def infiniteloop(dataloader):
     while True:
@@ -118,9 +116,10 @@ def train(config, workdir):
   continuous = config.training.continuous
   reduce_mean = config.training.reduce_mean
   likelihood_weighting = config.training.likelihood_weighting
+  tim = ContextTimer(total_steps= num_train_steps - initial_step)
   train_step_fn = losses.get_step_fn(sde, train=True, optimize_fn=optimize_fn,
                                      reduce_mean=reduce_mean, continuous=continuous,
-                                     likelihood_weighting=likelihood_weighting)
+                                     likelihood_weighting=likelihood_weighting, tim = tim)
   eval_step_fn = losses.get_step_fn(sde, train=False, optimize_fn=optimize_fn,
                                     reduce_mean=reduce_mean, continuous=continuous,
                                     likelihood_weighting=likelihood_weighting)
@@ -136,18 +135,18 @@ def train(config, workdir):
   # In case there are multiple hosts (e.g., TPU pods), only log to host 0
   logging.info("Starting training loop at step %d." % (initial_step,))
 
-  start_time = time.time()
   for step in range(initial_step, num_train_steps + 1):
+    tim.step_start()
     # Convert data to JAX arrays and normalize them. Use ._numpy() to avoid copy.
-    batch = next(train_iter).to(config.device).float()
-    batch = scaler(batch)
+    with tim.track('data'):
+      batch = next(train_iter).to(config.device).float()
+    # batch = scaler(batch)
     # Execute one training step
-    loss = train_step_fn(state, batch)
+    with tim.track('loss'):
+      loss = train_step_fn(state, batch)
     if step % config.training.log_freq == 0 and (step - initial_step) !=0 :
-      time_elapsed = time.time() - start_time
-      rate = time_elapsed/(step-initial_step)
-      time_left = (num_train_steps - step) * rate
-      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, [{time_to_str(time_elapsed)}<{time_to_str(time_left)}, {rate:.4f}s/it]")
+      tim_stats = tim.stats()
+      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, {tim_stats}")
       writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
@@ -185,6 +184,7 @@ def train(config, workdir):
 
         with open(os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
           save_image(image_grid, fout)
+    tim.step_end()
 
 
 def evaluate(config,

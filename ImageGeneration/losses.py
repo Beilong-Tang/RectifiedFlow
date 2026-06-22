@@ -134,7 +134,7 @@ def get_rectified_flow_loss_fn(sde, train, reduce_mean=True, eps=1e-3):
 
 
 
-def get_step_fn(sde, train, optimize_fn=None, reduce_mean=False, continuous=True, likelihood_weighting=False):
+def get_step_fn(sde, train, optimize_fn=None, reduce_mean=False, continuous=True, likelihood_weighting=False, tim = None):
   """Create a one-step training/evaluation function.
 
   Args:
@@ -176,8 +176,16 @@ def get_step_fn(sde, train, optimize_fn=None, reduce_mean=False, continuous=True
     if train:
       optimizer = state['optimizer']
       optimizer.zero_grad()
-      loss = loss_fn(model, batch)
-      loss.backward()
+      if tim is None:
+        loss = loss_fn(model, batch)
+      else:
+        with tim.track("loss_fn"):
+            loss = loss_fn(model, batch)
+      if tim is None:
+        loss.backward()
+      else:
+        with tim.track("backward"):
+          loss.backward()
       optimize_fn(optimizer, model.parameters(), step=state['step'])
       state['step'] += 1
       state['ema'].update(model.parameters())
