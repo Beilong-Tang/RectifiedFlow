@@ -45,6 +45,7 @@ from tim import ContextTimer
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from torch.utils.data.distributed import DistributedSampler
+import torch.distributed as dist
 
 FLAGS = flags.FLAGS
 
@@ -80,7 +81,7 @@ def train(rank, config, workdir, world_size):
   is_leader = rank == 0
   is_dist = world_size > 1
   # set the device
-  config.device = f"cuda:{rank}"
+  config.device = torch.device(f"cuda:{rank}")
   # Create directories for experimental logs
   sample_dir = os.path.join(workdir, "samples")
   os.makedirs(sample_dir, exist_ok=True)
@@ -187,29 +188,33 @@ def train(rank, config, workdir, world_size):
     #   writer.add_scalar("eval_loss", eval_loss.item(), step)
 
     # Save a checkpoint periodically and generate samples if needed
-    if is_leader and step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
-      # Save the checkpoint.
-      save_step = step // config.training.snapshot_freq
-      save_checkpoint(os.path.join(checkpoint_dir, f'checkpoint_{save_step}.pth'), state)
+    if step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
+      if is_leader:
+        # Save the checkpoint.
+        save_step = step // config.training.snapshot_freq
+        save_checkpoint(os.path.join(checkpoint_dir, f'checkpoint_{save_step}.pth'), state)
 
-      module = score_model if not is_dist else score_model.module
+        module = score_model if not is_dist else score_model.module
 
-      # Generate and save samples
-      if config.training.snapshot_sampling:
-        ema.store(module.parameters())
-        ema.copy_to(module.parameters())
-        sample, n = sampling_fn(score_model)
-        ema.restore(module.parameters())
-        this_sample_dir = os.path.join(sample_dir, "iter_{}".format(step))
-        os.makedirs(this_sample_dir, exist_ok=True)
-        nrow = int(np.sqrt(sample.shape[0]))
-        image_grid = make_grid(sample, nrow, padding=2)
-        sample = np.clip(sample.permute(0, 2, 3, 1).cpu().numpy() * 255, 0, 255).astype(np.uint8)
-        with open(os.path.join(this_sample_dir, "sample.npy"), "wb") as fout:
-          np.save(fout, sample)
+        # Generate and save samples
+        if config.training.snapshot_sampling:
+          ema.store(module.parameters())
+          ema.copy_to(module.parameters())
+          sample, n = sampling_fn(score_model)
+          ema.restore(module.parameters())
+          this_sample_dir = os.path.join(sample_dir, "iter_{}".format(step))
+          os.makedirs(this_sample_dir, exist_ok=True)
+          nrow = int(np.sqrt(sample.shape[0]))
+          image_grid = make_grid(sample, nrow, padding=2)
+          sample = np.clip(sample.permute(0, 2, 3, 1).cpu().numpy() * 255, 0, 255).astype(np.uint8)
+          with open(os.path.join(this_sample_dir, "sample.npy"), "wb") as fout:
+            np.save(fout, sample)
 
-        with open(os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
-          save_image(image_grid, fout)
+          with open(os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
+            save_image(image_grid, fout)
+
+        if is_dist:
+          dist.barrier()
     tim.step_end()
 
 
