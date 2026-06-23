@@ -27,7 +27,7 @@ def get_config():
   training.continuous = False
   training.snapshot_freq = 100000
   training.reduce_mean = True
-  training.n_iters = 1300001 // 2
+  training.n_iters = 1300000 // 2 + 1
   training.batch_size = 256
 
   # sampling
