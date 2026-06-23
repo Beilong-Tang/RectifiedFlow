@@ -38,7 +38,7 @@ import likelihood
 import sde_lib
 from absl import flags
 import torch
-from torch.utils import tensorboard
+# from torch.utils import tensorboard
 from torchvision.utils import make_grid, save_image
 from utils import save_checkpoint, restore_checkpoint
 from tim import ContextTimer
@@ -89,7 +89,8 @@ def train(rank, config, workdir, world_size):
   tb_dir = os.path.join(workdir, "tensorboard")
   os.makedirs(tb_dir, exist_ok=True)
   if is_leader:
-    writer = tensorboard.SummaryWriter(tb_dir)
+    # writer = tensorboard.SummaryWriter(tb_dir)
+    pass
 
   # Initialize model.
   score_model = mutils.create_model(config)
@@ -159,7 +160,7 @@ def train(rank, config, workdir, world_size):
 
   # In case there are multiple hosts (e.g., TPU pods), only log to host 0
   logging.info("Starting training loop at step %d." % (initial_step,))
-
+  print('start training...')
   for step in range(initial_step, num_train_steps + 1):
     tim.step_start()
     # Convert data to JAX arrays and normalize them. Use ._numpy() to avoid copy.
@@ -169,13 +170,13 @@ def train(rank, config, workdir, world_size):
     # Execute one training step
     with tim.track('loss'):
       loss = train_step_fn(state, batch)
-    if is_leader and step % config.training.log_freq == 0 and (step - initial_step) !=0 :
+    if is_leader and step % config.training.log_freq == 0 and step != initial_step :
       tim_stats = tim.stats()
-      logging.info(f"step: {step}, training_loss: {loss.item():.5e}, {tim_stats}")
-      writer.add_scalar("training_loss", loss, step)
+      print(f"step: {step}, training_loss: {loss.item():.5e}, {tim_stats}")
+      # writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
-    if step != 0 and step % config.training.snapshot_freq_for_preemption == 0:
+    if step != initial_step and step % config.training.snapshot_freq_for_preemption == 0:
       if is_leader:
         save_checkpoint(checkpoint_meta_dir, state, is_dist)
       if is_dist:

@@ -12,11 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# import builtins
+# import traceback
+
+# real_import = builtins.__import__
+
+# def debug_import(name, *args, **kwargs):
+#     if name.startswith("tensorflow"):
+#         print("\n=== TensorFlow imported ===")
+#         traceback.print_stack(limit=20)
+#         print("==========================\n")
+
+#     return real_import(name, *args, **kwargs)
+
+# builtins.__import__ = debug_import
 
 """Training and evaluation"""
-print("importing run_lib")
+# print("import run_lib")
 import run_lib
-print("finished importing run_lib")
+# print("finish run_lib import")
 # import run_lib_reflow
 # import run_lib_pytorch
 from absl import app
