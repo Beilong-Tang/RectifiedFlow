@@ -213,8 +213,8 @@ def train(rank, config, workdir, world_size):
           with open(os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
             save_image(image_grid, fout)
 
-        if is_dist:
-          dist.barrier()
+      if is_dist:
+        dist.barrier()
     tim.step_end()
 
 
