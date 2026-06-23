@@ -169,7 +169,7 @@ def train(rank, config, workdir, world_size):
     # Execute one training step
     with tim.track('loss'):
       loss = train_step_fn(state, batch)
-    if step % config.training.log_freq == 0 and (step - initial_step) !=0 :
+    if is_leader and step % config.training.log_freq == 0 and (step - initial_step) !=0 :
       tim_stats = tim.stats()
       logging.info(f"step: {step}, training_loss: {loss.item():.5e}, {tim_stats}")
       writer.add_scalar("training_loss", loss, step)
