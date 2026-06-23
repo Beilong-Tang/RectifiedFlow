@@ -176,7 +176,10 @@ def train(rank, config, workdir, world_size):
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
     if step != 0 and step % config.training.snapshot_freq_for_preemption == 0:
-      save_checkpoint(checkpoint_meta_dir, state, is_dist)
+      if is_leader:
+        save_checkpoint(checkpoint_meta_dir, state, is_dist)
+      if is_dist:
+        dist.barrier()
 
     # Report the loss on an evaluation dataset periodically
     # if step % config.training.eval_freq == 0:

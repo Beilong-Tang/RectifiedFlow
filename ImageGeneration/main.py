@@ -14,8 +14,9 @@
 # limitations under the License.
 
 """Training and evaluation"""
-
+print("importing run_lib")
 import run_lib
+print("finished importing run_lib")
 # import run_lib_reflow
 # import run_lib_pytorch
 from absl import app
