@@ -192,7 +192,7 @@ def train(rank, config, workdir, world_size):
     #   writer.add_scalar("eval_loss", eval_loss.item(), step)
 
     # Save a checkpoint periodically and generate samples if needed
-    if step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
+    if step != initial_step and step % config.training.snapshot_freq == 0 or step == num_train_steps:
       if is_leader:
         # Save the checkpoint.
         save_step = step // config.training.snapshot_freq

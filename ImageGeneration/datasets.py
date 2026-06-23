@@ -42,7 +42,7 @@ def get_dataset(config, uniform_dequantization=False, evaluation=False, is_dist 
               num_workers=4, drop_last=False)
         else:
            train_dataloader = torch.utils.data.DataLoader(
-              train_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(train_dataset),
+              train_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(train_dataset), pin_memory=True, persistent_workers=True,
               num_workers=4, drop_last=False)
         
         eval_dataset = CIFAR10(
@@ -55,7 +55,7 @@ def get_dataset(config, uniform_dequantization=False, evaluation=False, is_dist 
               num_workers=4, drop_last=False)
         else:
            eval_dataloader = torch.utils.data.DataLoader(
-              eval_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(eval_dataset),
+              eval_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(eval_dataset), pin_memory=True, persistent_workers=True,
               num_workers=4, drop_last=False)
         return train_dataloader, eval_dataloader
     else:

@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:h200:2
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH -c 12
+#SBATCH -c 20
 #SBATCH --mem=64G
 #SBATCH -t 36:00:00
 #SBATCH -o _logs_slurm/train_ddp/%x_%j.out
