@@ -56,7 +56,7 @@ def main(argv):
     # else:
     if FLAGS.num_gpus > 1:
        print("running ddp")
-       mp.spawn(run_lib.train, args=(FLAGS.config, FLAGS.workdir1, FLAGS.num_gpus), nprocs = FLAGS.num_gpus)
+       mp.spawn(run_lib.train, args=(FLAGS.config, FLAGS.workdir, FLAGS.num_gpus), nprocs = FLAGS.num_gpus)
     else:
       print("running single process")
       run_lib.train(0, FLAGS.config, FLAGS.workdir, 1)
