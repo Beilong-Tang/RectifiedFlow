@@ -21,6 +21,7 @@ import run_lib
 from absl import app
 from absl import flags
 from ml_collections.config_flags import config_flags
+import torch.multiprocessing as mp
 import os
 # import tensorflow as tf
 
@@ -53,8 +54,12 @@ def main(argv):
     # if 'pytorch' in FLAGS.config.data.dataset.lower():
     #     run_lib_pytorch.train(FLAGS.config, FLAGS.workdir)
     # else:
-    
-    run_lib.train(FLAGS.config, FLAGS.workdir)
+    if FLAGS.num_gpus > 1:
+       print("running ddp")
+       mp.spawn(run_lib.train, args=(FLAGS.config, FLAGS.workdir1, FLAGS.num_gpus), nprocs = FLAGS.num_gpus)
+    else:
+      print("running single process")
+      run_lib.train(0, FLAGS.config, FLAGS.workdir, 1)
   elif FLAGS.mode == "eval":
     # Run the evaluation pipeline
     if 'pytorch' in FLAGS.config.data.dataset.lower():

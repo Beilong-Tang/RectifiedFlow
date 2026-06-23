@@ -42,17 +42,32 @@ from torch.utils import tensorboard
 from torchvision.utils import make_grid, save_image
 from utils import save_checkpoint, restore_checkpoint
 from tim import ContextTimer
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+from torch.utils.data.distributed import DistributedSampler
 
 FLAGS = flags.FLAGS
 
-def infiniteloop(dataloader, is_ddp = False):
+def infiniteloop(dataloader, start_epoch = 0, is_ddp = False):
     while True:
+        if is_ddp:
+          dataloader.sampler.set_epoch(start_epoch)
         for x, y in iter(dataloader):
             yield x
+        start_epoch += 1
 
+def ddp_setup(rank: int, world_size: int):
+   """
+   Args:
+       rank: Unique identifier of each process
+      world_size: Total number of processes
+   """
+   os.environ["MASTER_ADDR"] = "localhost"
+   os.environ["MASTER_PORT"] = "12355"
+   torch.cuda.set_device(rank)
+   init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
-
-def train(config, workdir):
+def train(rank, config, workdir, world_size):
   """Runs the training pipeline.
 
   Args:
@@ -60,18 +75,26 @@ def train(config, workdir):
     workdir: Working directory for checkpoints and TF summaries. If this
       contains checkpoint training will be resumed from the latest checkpoint.
   """
-
+  print(f"rank {rank} of world size {world_size} is inited...")
+  ddp_setup(rank, world_size)
+  is_leader = rank == 0
+  is_dist = world_size > 1
+  # set the device
+  config.device = f"cuda:{rank}"
   # Create directories for experimental logs
   sample_dir = os.path.join(workdir, "samples")
   os.makedirs(sample_dir, exist_ok=True)
 
   tb_dir = os.path.join(workdir, "tensorboard")
   os.makedirs(tb_dir, exist_ok=True)
-  writer = tensorboard.SummaryWriter(tb_dir)
+  if is_leader:
+    writer = tensorboard.SummaryWriter(tb_dir)
 
   # Initialize model.
   score_model = mutils.create_model(config)
   ema = ExponentialMovingAverage(score_model.parameters(), decay=config.model.ema_rate)
+  if is_dist:
+    score_model = DDP(score_model, device_ids=[config.device])
   optimizer = losses.get_optimizer(config, score_model.parameters())
   state = dict(optimizer=optimizer, model=score_model, ema=ema, step=0)
 
@@ -82,15 +105,17 @@ def train(config, workdir):
   os.makedirs(checkpoint_dir, exist_ok=True)
   os.makedirs(os.path.dirname(checkpoint_meta_dir), exist_ok=True)
   # Resume training when intermediate checkpoints are detected
-  state = restore_checkpoint(checkpoint_meta_dir, state, config.device)
+  state = restore_checkpoint(checkpoint_meta_dir, state, config.device, is_dist)
   initial_step = int(state['step'])
 
   # Build data iterators
+  config.training.batch_size = config.training.batch_size // world_size
+  print(f"batch size {config.training.batch_size}")
   train_ds, eval_ds = datasets.get_dataset(config,
-                                              uniform_dequantization=config.data.uniform_dequantization)
+                                              uniform_dequantization=config.data.uniform_dequantization, is_dist = is_dist)
 
-  train_iter = infiniteloop(train_ds)  # pytype: disable=wrong-arg-types
-  eval_iter = infiniteloop(eval_ds)  # pytype: disable=wrong-arg-types
+  train_iter = infiniteloop(train_ds, initial_step, is_dist)  # pytype: disable=wrong-arg-types
+  eval_iter = infiniteloop(eval_ds, initial_step, is_dist)  # pytype: disable=wrong-arg-types
   # Create data normalizer and its inverse
   scaler = datasets.get_data_scaler(config)
   inverse_scaler = datasets.get_data_inverse_scaler(config)
@@ -120,10 +145,10 @@ def train(config, workdir):
   tim = ContextTimer(total_steps= num_train_steps - initial_step)
   train_step_fn = losses.get_step_fn(sde, train=True, optimize_fn=optimize_fn,
                                      reduce_mean=reduce_mean, continuous=continuous,
-                                     likelihood_weighting=likelihood_weighting, tim = tim)
-  eval_step_fn = losses.get_step_fn(sde, train=False, optimize_fn=optimize_fn,
-                                    reduce_mean=reduce_mean, continuous=continuous,
-                                    likelihood_weighting=likelihood_weighting)
+                                     likelihood_weighting=likelihood_weighting, tim = tim, is_dist = is_dist)
+  # eval_step_fn = losses.get_step_fn(sde, train=False, optimize_fn=optimize_fn,
+  #                                   reduce_mean=reduce_mean, continuous=continuous,
+  #                                   likelihood_weighting=likelihood_weighting)
 
   # Building sampling functions
   if config.training.snapshot_sampling:
@@ -150,7 +175,7 @@ def train(config, workdir):
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
     if step != 0 and step % config.training.snapshot_freq_for_preemption == 0:
-      save_checkpoint(checkpoint_meta_dir, state)
+      save_checkpoint(checkpoint_meta_dir, state, is_dist)
 
     # Report the loss on an evaluation dataset periodically
     # if step % config.training.eval_freq == 0:
@@ -162,17 +187,19 @@ def train(config, workdir):
     #   writer.add_scalar("eval_loss", eval_loss.item(), step)
 
     # Save a checkpoint periodically and generate samples if needed
-    if step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
+    if is_leader and step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
       # Save the checkpoint.
       save_step = step // config.training.snapshot_freq
       save_checkpoint(os.path.join(checkpoint_dir, f'checkpoint_{save_step}.pth'), state)
 
+      module = score_model if not is_dist else score_model.module
+
       # Generate and save samples
       if config.training.snapshot_sampling:
-        ema.store(score_model.parameters())
-        ema.copy_to(score_model.parameters())
+        ema.store(module.parameters())
+        ema.copy_to(module.parameters())
         sample, n = sampling_fn(score_model)
-        ema.restore(score_model.parameters())
+        ema.restore(module.parameters())
         this_sample_dir = os.path.join(sample_dir, "iter_{}".format(step))
         os.makedirs(this_sample_dir, exist_ok=True)
         nrow = int(np.sqrt(sample.shape[0]))

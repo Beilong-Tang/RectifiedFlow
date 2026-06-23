@@ -1,6 +1,7 @@
 from torchvision.datasets import CIFAR10
 from torchvision import transforms
 import torch
+from torch.utils.data.distributed import DistributedSampler
 
 
 def get_data_scaler(config):
@@ -20,7 +21,7 @@ def get_data_inverse_scaler(config):
   else:
     return lambda x: x
 
-def get_dataset(config, uniform_dequantization=False, evaluation=False):
+def get_dataset(config, uniform_dequantization=False, evaluation=False, is_dist = False):
     assert uniform_dequantization is False
 
     batch_size = config.training.batch_size if not evaluation else config.eval.batch_size
@@ -35,17 +36,27 @@ def get_dataset(config, uniform_dequantization=False, evaluation=False):
           root='/work/btang1/pytorch-ddpm/data', train=True, download=True,
           transform=transform
         )
-        train_dataloader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True,
-            num_workers=4, drop_last=False)
+        if not is_dist:
+          train_dataloader = torch.utils.data.DataLoader(
+              train_dataset, batch_size=batch_size, shuffle=True,
+              num_workers=4, drop_last=False)
+        else:
+           train_dataloader = torch.utils.data.DataLoader(
+              train_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(train_dataset),
+              num_workers=4, drop_last=False)
         
         eval_dataset = CIFAR10(
           root='/work/btang1/pytorch-ddpm/data', train=False, download=True,
           transform=transform
         )
-        eval_dataloader = torch.utils.data.DataLoader(
-            eval_dataset, batch_size=batch_size, shuffle=False,
-            num_workers=4, drop_last=False)
+        if not is_dist:
+          eval_dataloader = torch.utils.data.DataLoader(
+              eval_dataset, batch_size=batch_size, shuffle=False,
+              num_workers=4, drop_last=False)
+        else:
+           eval_dataloader = torch.utils.data.DataLoader(
+              eval_dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(eval_dataset),
+              num_workers=4, drop_last=False)
         return train_dataloader, eval_dataloader
     else:
         raise Exception(f"current dataset: {config.data.dataset}, is not supported")
