@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Utility functions for computing FID/Inception scores."""
-
+print("evaluation is utilized")
 import jax
 import numpy as np
 import six
