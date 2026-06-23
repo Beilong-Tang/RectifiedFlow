@@ -33,7 +33,7 @@ flags.DEFINE_string("workdir", None, "Work directory.")
 flags.DEFINE_enum("mode", None, ["train", "eval", "reflow"], "Running mode")
 flags.DEFINE_string("eval_folder", "eval",
                     "The folder name for storing evaluation results")
-flags.DEFINE_int("num_gpus", 1, "num of gpus to use")
+flags.DEFINE_integer("num_gpus", 1, "num of gpus to use")
 flags.mark_flags_as_required(["workdir", "config", "mode"])
 
 
