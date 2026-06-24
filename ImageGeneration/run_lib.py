@@ -38,7 +38,7 @@ import likelihood
 import sde_lib
 from absl import flags
 import torch
-# from torch.utils import tensorboard
+from torch.utils import tensorboard
 from torchvision.utils import make_grid, save_image
 from utils import save_checkpoint, restore_checkpoint
 from tim import ContextTimer

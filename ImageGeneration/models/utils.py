@@ -97,7 +97,7 @@ def create_model(config):
       num_params += p.numel()
   print('Number of Parameters in the Score Model:', num_params)
 
-  # score_model = torch.nn.DataParallel(score_model)
+  score_model = torch.nn.DataParallel(score_model)
   return score_model
 
 
