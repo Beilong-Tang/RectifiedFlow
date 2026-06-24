@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH -c 8
 #SBATCH --mem=64G
-#SBATCH -t 36:00:00
+#SBATCH -t 96:00:00
 #SBATCH -o _logs_slurm/train/%x_%j.out
 #SBATCH -e _logs_slurm/train/%x_%j.err
 source ~/miniforge3/etc/profile.d/conda.sh

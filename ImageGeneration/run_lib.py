@@ -89,7 +89,7 @@ def train(rank, config, workdir, world_size):
   tb_dir = os.path.join(workdir, "tensorboard")
   os.makedirs(tb_dir, exist_ok=True)
   if is_leader:
-    # writer = tensorboard.SummaryWriter(tb_dir)
+    writer = tensorboard.SummaryWriter(tb_dir)
     pass
 
   # Initialize model.
@@ -173,7 +173,7 @@ def train(rank, config, workdir, world_size):
     if is_leader and step % config.training.log_freq == 0 and step != initial_step :
       tim_stats = tim.stats()
       print(f"step: {step}, training_loss: {loss.item():.5e}, {tim_stats}")
-      # writer.add_scalar("training_loss", loss, step)
+      writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
     if step != initial_step and step % config.training.snapshot_freq_for_preemption == 0:
