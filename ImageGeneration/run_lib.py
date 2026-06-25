@@ -252,6 +252,7 @@ def evaluate(config,
   optimizer = losses.get_optimizer(config, score_model.parameters())
   ema = ExponentialMovingAverage(score_model.parameters(), decay=config.model.ema_rate)
   state = dict(optimizer=optimizer, model=score_model, ema=ema, step=0)
+  print("finish initialized the model")
 
   checkpoint_dir = os.path.join(workdir, "checkpoints")
 
@@ -268,6 +269,7 @@ def evaluate(config,
   elif config.training.sde.lower() == 'rectified_flow':
     sde = sde_lib.RectifiedFlow(init_type=config.sampling.init_type, noise_scale=config.sampling.init_noise_scale, use_ode_sampler=config.sampling.use_ode_sampler, sigma_var=config.sampling.sigma_variance, ode_tol=config.sampling.ode_tol, sample_N=config.sampling.sample_N)
     sampling_eps = 1e-3
+    print("init sde")
   else:
     raise NotImplementedError(f"SDE {config.training.sde} unknown.")
 
@@ -309,6 +311,7 @@ def evaluate(config,
     sampling_shape = (config.eval.batch_size,
                       config.data.num_channels,
                       config.data.image_size, config.data.image_size)
+    print('finish get sampling fn')
     sampling_fn = sampling.get_sampling_fn(config, sde, sampling_shape, inverse_scaler, sampling_eps)
 
   # Use inceptionV3 for images with resolution higher than 256.
@@ -386,6 +389,7 @@ def evaluate(config,
     # Generate samples and compute IS/FID/KID when enabled
     if config.eval.enable_sampling:
       num_sampling_rounds = config.eval.num_samples // config.eval.batch_size + 1
+      print("running sampling")
       for r in range(num_sampling_rounds):
         logging.info("sampling -- ckpt: %d, round: %d" % (ckpt, r))
 
