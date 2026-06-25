@@ -20,10 +20,11 @@ import gc
 import io
 import os
 import time
+import glob
 
 import numpy as np
-# import tensorflow as tf
-# import tensorflow_gan as tfgan
+import tensorflow as tf
+import tensorflow_gan as tfgan
 from datetime import timedelta
 import logging
 # Keep the import below for registering all model definitions
@@ -33,7 +34,7 @@ import sampling
 from models import utils as mutils
 from models.ema import ExponentialMovingAverage
 import datasets
-# import evaluation
+import evaluation
 import likelihood
 import sde_lib
 from absl import flags
@@ -235,7 +236,7 @@ def evaluate(config,
   """
   # Create directory to eval_folder
   eval_dir = os.path.join(workdir, eval_folder)
-  tf.io.gfile.makedirs(eval_dir)
+  os.makedirs(eval_dir, exist_ok=True)
 
   # Build data pipeline
   train_ds, eval_ds, _ = datasets.get_dataset(config,
@@ -320,7 +321,7 @@ def evaluate(config,
     # Wait if the target checkpoint doesn't exist yet
     waiting_message_printed = False
     ckpt_filename = os.path.join(checkpoint_dir, "checkpoint_{}.pth".format(ckpt))
-    while not tf.io.gfile.exists(ckpt_filename):
+    while not os.path.exists(ckpt_filename):
       if not waiting_message_printed:
         logging.warning("Waiting for the arrival of checkpoint_%d" % (ckpt,))
         waiting_message_printed = True
@@ -391,13 +392,13 @@ def evaluate(config,
         # Directory to save samples. Different for each host to avoid writing conflicts
         this_sample_dir = os.path.join(
           eval_dir, f"ckpt_{ckpt}")
-        tf.io.gfile.makedirs(this_sample_dir)
+        os.makedirs(this_sample_dir, exist_ok=True)
         samples, n = sampling_fn(score_model)
         samples = np.clip(samples.permute(0, 2, 3, 1).cpu().numpy() * 255., 0, 255).astype(np.uint8)
         samples = samples.reshape(
           (-1, config.data.image_size, config.data.image_size, config.data.num_channels))
         # Write samples to disk or Google Cloud Storage
-        with tf.io.gfile.GFile(
+        with open(
             os.path.join(this_sample_dir, f"samples_{r}.npz"), "wb") as fout:
           io_buffer = io.BytesIO()
           np.savez_compressed(io_buffer, samples=samples)
@@ -410,7 +411,7 @@ def evaluate(config,
         # Force garbage collection again before returning to JAX code
         gc.collect()
         # Save latent represents of the Inception network to disk or Google Cloud Storage
-        with tf.io.gfile.GFile(
+        with open(
             os.path.join(this_sample_dir, f"statistics_{r}.npz"), "wb") as fout:
           io_buffer = io.BytesIO()
           np.savez_compressed(
@@ -422,9 +423,9 @@ def evaluate(config,
       all_logits = []
       all_pools = []
       this_sample_dir = os.path.join(eval_dir, f"ckpt_{ckpt}")
-      stats = tf.io.gfile.glob(os.path.join(this_sample_dir, "statistics_*.npz"))
+      stats = glob.glob(os.path.join(this_sample_dir, "statistics_*.npz"))
       for stat_file in stats:
-        with tf.io.gfile.GFile(stat_file, "rb") as fin:
+        with open(stat_file, "rb") as fin:
           stat = np.load(fin)
           if not inceptionv3:
             all_logits.append(stat["logits"])

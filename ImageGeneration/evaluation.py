@@ -15,7 +15,7 @@
 
 """Utility functions for computing FID/Inception scores."""
 print("evaluation is utilized")
-import jax
+# import jax
 import numpy as np
 import six
 import tensorflow as tf
@@ -103,44 +103,70 @@ def run_inception_jit(inputs,
     classifier_fn=classifier_fn_from_tfhub(None, inception_model),
     dtypes=_DEFAULT_DTYPES)
 
-
 @tf.function
-def run_inception_distributed(input_tensor,
-                              inception_model,
-                              num_batches=1,
-                              inceptionv3=False):
-  """Distribute the inception network computation to all available TPUs.
+def run_inception_distributed(
+    input_tensor,
+    inception_model,
+    num_batches=1,
+    inceptionv3=False,
+):
+    """Run inception on a single device."""
 
-  Args:
-    input_tensor: The input images. Assumed to be within [0, 255].
-    inception_model: The inception network model obtained from `tfhub`.
-    num_batches: The number of batches used for dividing the input.
-    inceptionv3: If `True`, use InceptionV3, otherwise use InceptionV1.
+    res = run_inception_jit(
+        input_tensor,
+        inception_model,
+        num_batches=num_batches,
+        inceptionv3=inceptionv3,
+    )
 
-  Returns:
-    A dictionary with key `pool_3` and `logits`, representing the pool_3 and
-      logits of the inception network respectively.
-  """
-  num_tpus = jax.local_device_count()
-  input_tensors = tf.split(input_tensor, num_tpus, axis=0)
-  pool3 = []
-  logits = [] if not inceptionv3 else None
-  device_format = '/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
-  for i, tensor in enumerate(input_tensors):
-    with tf.device(device_format.format(i)):
-      tensor_on_device = tf.identity(tensor)
-      res = run_inception_jit(
-        tensor_on_device, inception_model, num_batches=num_batches,
-        inceptionv3=inceptionv3)
+    if inceptionv3:
+        return {
+            "pool_3": res,
+            "logits": None,
+        }
 
-      if not inceptionv3:
-        pool3.append(res['pool_3'])
-        logits.append(res['logits'])  # pytype: disable=attribute-error
-      else:
-        pool3.append(res)
-
-  with tf.device('/CPU'):
     return {
-      'pool_3': tf.concat(pool3, axis=0),
-      'logits': tf.concat(logits, axis=0) if not inceptionv3 else None
+        "pool_3": res["pool_3"],
+        "logits": res["logits"],
     }
+
+# @tf.function
+# def run_inception_distributed(input_tensor,
+#                               inception_model,
+#                               num_batches=1,
+#                               inceptionv3=False):
+#   """Distribute the inception network computation to all available TPUs.
+
+#   Args:
+#     input_tensor: The input images. Assumed to be within [0, 255].
+#     inception_model: The inception network model obtained from `tfhub`.
+#     num_batches: The number of batches used for dividing the input.
+#     inceptionv3: If `True`, use InceptionV3, otherwise use InceptionV1.
+
+#   Returns:
+#     A dictionary with key `pool_3` and `logits`, representing the pool_3 and
+#       logits of the inception network respectively.
+#   """
+#   num_tpus = jax.local_device_count()
+#   input_tensors = tf.split(input_tensor, num_tpus, axis=0)
+#   pool3 = []
+#   logits = [] if not inceptionv3 else None
+#   device_format = '/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
+#   for i, tensor in enumerate(input_tensors):
+#     with tf.device(device_format.format(i)):
+#       tensor_on_device = tf.identity(tensor)
+#       res = run_inception_jit(
+#         tensor_on_device, inception_model, num_batches=num_batches,
+#         inceptionv3=inceptionv3)
+
+#       if not inceptionv3:
+#         pool3.append(res['pool_3'])
+#         logits.append(res['logits'])  # pytype: disable=attribute-error
+#       else:
+#         pool3.append(res)
+
+#   with tf.device('/CPU'):
+#     return {
+#       'pool_3': tf.concat(pool3, axis=0),
+#       'logits': tf.concat(logits, axis=0) if not inceptionv3 else None
+#     }
