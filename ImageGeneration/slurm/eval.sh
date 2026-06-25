@@ -12,6 +12,6 @@
 #SBATCH -e _logs_slurm/eval/%x_%j.err
 source ~/miniforge3/etc/profile.d/conda.sh
 
-conda activate sbgm
+conda activate sbgm_no_tf
 
 python ./main.py --config ./configs/rectified_flow/cifar10_rf_gaussian_ddpmpp.py --eval_folder eval --mode eval --workdir ./logs/1_rectified_flow --config.eval.enable_sampling  --config.eval.batch_size 1024 --config.eval.num_samples 50000 --config.eval.begin_ckpt 13

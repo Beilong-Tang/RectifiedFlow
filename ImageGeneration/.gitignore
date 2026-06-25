@@ -210,3 +210,5 @@ tags
 logs/**
 
 _logs_slurm/
+assets/
+assets_bak/
