@@ -22,7 +22,7 @@ def get_data_inverse_scaler(config):
     return lambda x: x
 
 def get_dataset(config, uniform_dequantization=False, evaluation=False, is_dist = False):
-    assert uniform_dequantization is False
+    # assert uniform_dequantization is False
 
     batch_size = config.training.batch_size if not evaluation else config.eval.batch_size
 
