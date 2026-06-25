@@ -23,8 +23,8 @@ import time
 import glob
 
 import numpy as np
-import tensorflow as tf
-import tensorflow_gan as tfgan
+# import tensorflow as tf
+# import tensorflow_gan as tfgan
 from datetime import timedelta
 import logging
 # Keep the import below for registering all model definitions
@@ -34,7 +34,7 @@ import sampling
 from models import utils as mutils
 from models.ema import ExponentialMovingAverage
 import datasets
-import evaluation
+# import evaluation
 import likelihood
 import sde_lib
 from absl import flags
@@ -315,8 +315,8 @@ def evaluate(config,
     sampling_fn = sampling.get_sampling_fn(config, sde, sampling_shape, inverse_scaler, sampling_eps)
 
   # Use inceptionV3 for images with resolution higher than 256.
-  inceptionv3 = config.data.image_size >= 256
-  inception_model = evaluation.get_inception_model(inceptionv3=inceptionv3)
+  # inceptionv3 = config.data.image_size >= 256
+  # inception_model = evaluation.get_inception_model(inceptionv3=inceptionv3)
 
   begin_ckpt = config.eval.begin_ckpt
   logging.info("begin checkpoint: %d" % (begin_ckpt,))
@@ -392,6 +392,7 @@ def evaluate(config,
       print("running sampling")
       for r in range(num_sampling_rounds):
         logging.info("sampling -- ckpt: %d, round: %d" % (ckpt, r))
+        print("sampling -- ckpt: %d, round: %d" % (ckpt, r))
 
         # Directory to save samples. Different for each host to avoid writing conflicts
         this_sample_dir = os.path.join(
@@ -410,18 +411,18 @@ def evaluate(config,
 
         # Force garbage collection before calling TensorFlow code for Inception network
         gc.collect()
-        latents = evaluation.run_inception_distributed(samples, inception_model,
-                                                       inceptionv3=inceptionv3)
-        # Force garbage collection again before returning to JAX code
-        gc.collect()
-        # Save latent represents of the Inception network to disk or Google Cloud Storage
-        with open(
-            os.path.join(this_sample_dir, f"statistics_{r}.npz"), "wb") as fout:
-          io_buffer = io.BytesIO()
-          np.savez_compressed(
-            io_buffer, pool_3=latents["pool_3"], logits=latents["logits"])
-          fout.write(io_buffer.getvalue())
-
+        # latents = evaluation.run_inception_distributed(samples, inception_model,
+        #                                                inceptionv3=inceptionv3)
+        # # Force garbage collection again before returning to JAX code
+        # gc.collect()
+        # # Save latent represents of the Inception network to disk or Google Cloud Storage
+        # with open(
+        #     os.path.join(this_sample_dir, f"statistics_{r}.npz"), "wb") as fout:
+        #   io_buffer = io.BytesIO()
+        #   np.savez_compressed(
+        #     io_buffer, pool_3=latents["pool_3"], logits=latents["logits"])
+        #   fout.write(io_buffer.getvalue())
+      print("finished sampling yayayay")
       # Compute inception scores, FIDs and KIDs.
       # Load all statistics that have been previously computed and saved for each host
       all_logits = []
