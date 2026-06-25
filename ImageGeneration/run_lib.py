@@ -239,7 +239,7 @@ def evaluate(config,
   os.makedirs(eval_dir, exist_ok=True)
 
   # Build data pipeline
-  train_ds, eval_ds, _ = datasets.get_dataset(config,
+  train_ds, eval_ds = datasets.get_dataset(config,
                                               uniform_dequantization=config.data.uniform_dequantization,
                                               evaluation=True)
 
@@ -285,7 +285,7 @@ def evaluate(config,
 
 
   # Create data loaders for likelihood evaluation. Only evaluate on uniformly dequantized data
-  train_ds_bpd, eval_ds_bpd, _ = datasets.get_dataset(config,
+  train_ds_bpd, eval_ds_bpd= datasets.get_dataset(config,
                                                       uniform_dequantization=True, evaluation=True)
   if config.eval.bpd_dataset.lower() == 'train':
     ds_bpd = train_ds_bpd
