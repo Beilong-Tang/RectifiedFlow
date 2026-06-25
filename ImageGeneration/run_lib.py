@@ -21,6 +21,8 @@ import io
 import os
 import time
 import glob
+import tqdm
+from PIL import Image
 
 import numpy as np
 # import tensorflow as tf
@@ -390,27 +392,30 @@ def evaluate(config,
     if config.eval.enable_sampling:
       num_sampling_rounds = config.eval.num_samples // config.eval.batch_size + 1
       print("running sampling")
-      for r in range(num_sampling_rounds):
-        logging.info("sampling -- ckpt: %d, round: %d" % (ckpt, r))
-        print("sampling -- ckpt: %d, round: %d" % (ckpt, r))
+      ct = 0
+      for r in tqdm.tqdm(list(range(num_sampling_rounds))):
+        # logging.info("sampling -- ckpt: %d, round: %d" % (ckpt, r))
+        # print("sampling -- ckpt: %d, round: %d" % (ckpt, r))
 
         # Directory to save samples. Different for each host to avoid writing conflicts
         this_sample_dir = os.path.join(
           eval_dir, f"ckpt_{ckpt}")
+        this_sample_img_dir = os.path.join(this_sample_dir, 'imgs')
+        os.makedirs(this_sample_img_dir, exist_ok=True)
         os.makedirs(this_sample_dir, exist_ok=True)
         samples, n = sampling_fn(score_model)
         samples = np.clip(samples.permute(0, 2, 3, 1).cpu().numpy() * 255., 0, 255).astype(np.uint8)
         samples = samples.reshape(
           (-1, config.data.image_size, config.data.image_size, config.data.num_channels))
         # Write samples to disk or Google Cloud Storage
-        with open(
-            os.path.join(this_sample_dir, f"samples_{r}.npz"), "wb") as fout:
-          io_buffer = io.BytesIO()
-          np.savez_compressed(io_buffer, samples=samples)
-          fout.write(io_buffer.getvalue())
-
+        # save images
+        for s in samples:
+          img = Image.fromarray(s)
+          img.save(os.path.join(this_sample_img_dir, f"sample_{ct:06d}.png"))
+          ct+=1
+          pass
         # Force garbage collection before calling TensorFlow code for Inception network
-        gc.collect()
+        # gc.collect()
         # latents = evaluation.run_inception_distributed(samples, inception_model,
         #                                                inceptionv3=inceptionv3)
         # # Force garbage collection again before returning to JAX code
@@ -423,6 +428,7 @@ def evaluate(config,
         #     io_buffer, pool_3=latents["pool_3"], logits=latents["logits"])
         #   fout.write(io_buffer.getvalue())
       print("finished sampling yayayay")
+      return
       # Compute inception scores, FIDs and KIDs.
       # Load all statistics that have been previously computed and saved for each host
       all_logits = []
