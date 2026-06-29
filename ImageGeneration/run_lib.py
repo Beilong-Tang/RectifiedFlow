@@ -393,7 +393,10 @@ def evaluate(config,
       num_sampling_rounds = config.eval.num_samples // config.eval.batch_size + 1
       print("running sampling")
       ct = 0
+      end = False
       for r in tqdm.tqdm(list(range(num_sampling_rounds))):
+        if end:
+          break
         # logging.info("sampling -- ckpt: %d, round: %d" % (ckpt, r))
         # print("sampling -- ckpt: %d, round: %d" % (ckpt, r))
 
@@ -410,6 +413,9 @@ def evaluate(config,
         # Write samples to disk or Google Cloud Storage
         # save images
         for s in samples:
+          if ct > config.eval.num_samples:
+            end = True
+            break
           img = Image.fromarray(s)
           img.save(os.path.join(this_sample_img_dir, f"sample_{ct:06d}.png"))
           ct+=1
