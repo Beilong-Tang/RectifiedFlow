@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J eval_fm
+#SBATCH -J eval_fm_ckpt10
 #SBATCH -p gpu-hp
 #SBATCH --qos=ncsu_h200_hp
 #SBATCH --gres=gpu:h200:1
@@ -18,7 +18,7 @@ conda activate sbgm_no_tf
 
 ## Generation script
 
-# python ./main.py --config ./configs/rectified_flow/cifar10_rf_gaussian_ddpmpp.py --eval_folder eval --mode eval --workdir ./logs/1_rectified_flow --config.eval.enable_sampling  --config.eval.batch_size 1024 --config.eval.num_samples 50000 --config.eval.begin_ckpt 13
+python ./main.py --config ./configs/rectified_flow/cifar10_rf_gaussian_ddpmpp.py --eval_folder eval --mode eval --workdir ./logs/1_rectified_flow --config.eval.enable_sampling  --config.eval.batch_size 1024 --config.eval.num_samples 50000 --config.eval.begin_ckpt 10
 
 ## Evaluation script using torch-fidelity
 echo "[FID and IS]"
