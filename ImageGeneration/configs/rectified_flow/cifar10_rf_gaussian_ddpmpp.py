@@ -66,5 +66,6 @@ def get_config():
   model.embedding_type = 'positional'
   model.fourier_scale = 16
   model.conv_size = 3
+  
 
   return config
