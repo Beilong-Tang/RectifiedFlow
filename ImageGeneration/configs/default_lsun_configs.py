@@ -12,7 +12,7 @@ def get_default_configs():
   training.log_freq = 50
   training.eval_freq = 100
   ## store additional checkpoints for preemption in cloud computing environments
-  training.snapshot_freq_for_preemption = 5000
+  training.snapshot_freq_for_preemption = 10000
   ## produce samples at each snapshot.
   training.snapshot_sampling = True
   training.likelihood_weighting = False
