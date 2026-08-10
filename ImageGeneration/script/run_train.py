@@ -38,16 +38,18 @@ flags.DEFINE_string("datadir", None, "datadir")
 flags.mark_flags_as_required(["workdir", "config", "datadir"])
 
 from blpytorch.utils import setup_all_ddp
+from blpytorch.utils.tim import ContextTimer
 
 def infinite_dataloader(dataloader, is_ddp=False, initial_epoch=0):
     epoch = initial_epoch
     while True:
         if is_ddp:
             dataloader.sampler.set_epoch(epoch)
-        yield from dataloader
+        for data in dataloader:
+          yield data[0]
         epoch += 1
 
-def train(config, workdir):
+def train(argv):
   """Runs the training pipeline.
 
   Args:
@@ -55,13 +57,13 @@ def train(config, workdir):
     workdir: Working directory for checkpoints and TF summaries. If this
       contains checkpoint training will be resumed from the latest checkpoint.
   """
-
+  config, workdir = FLAGS.config, FLAGS.workdir
   # Create directories for experimental logs
   sample_dir = os.path.join(workdir, "samples")
-  os.makedirs(sample_dir)
+  os.makedirs(sample_dir, exist_ok=True)
 
   tb_dir = os.path.join(workdir, "tensorboard")
-  os.makedirs(tb_dir)
+  os.makedirs(tb_dir, exist_ok=True)
   writer = tensorboard.SummaryWriter(tb_dir)
 
   is_ddp, rank, logger, world_size, device = setup_all_ddp(None, workdir, init_process=True)
@@ -78,21 +80,23 @@ def train(config, workdir):
   checkpoint_dir = os.path.join(workdir, "checkpoints")
   # Intermediate checkpoints to resume training after pre-emption in cloud environments
   checkpoint_meta_dir = os.path.join(workdir, "checkpoints-meta", "checkpoint.pth")
-  os.makedirs(checkpoint_dir)
-  os.makedirs(os.path.dirname(checkpoint_meta_dir))
+  os.makedirs(checkpoint_dir, exist_ok=True)
+  os.makedirs(os.path.dirname(checkpoint_meta_dir), exist_ok=True)
   # Resume training when intermediate checkpoints are detected
   state = restore_checkpoint(checkpoint_meta_dir, state, config.device)
   initial_step = int(state['step']) + 1
 
   # Build data iterators
-  train_iter, eval_iter, _ = datasets.get_dataset(config,
+  logger.info(f'batch size per rank: {config.training.batch_size}')
+  train_iter, eval_iter = datasets.get_dataset(config,
+                                                  datadir=FLAGS.datadir,
                                                   uniform_dequantization=config.data.uniform_dequantization, 
                                                   is_dist=is_ddp)
   train_iter = infinite_dataloader(train_iter, is_ddp, initial_step)
   eval_iter = infinite_dataloader(eval_iter, False, 0)
 
   # Create data normalizer and its inverse
-  scaler = datasets.get_data_scaler(config)
+#   scaler = datasets.get_data_scaler(config)
   inverse_scaler = datasets.get_data_inverse_scaler(config)
 
   # Setup SDEs
@@ -134,6 +138,7 @@ def train(config, workdir):
   # In case there are multiple hosts (e.g., TPU pods), only log to host 0
   logger.info("Starting training loop at step %d." % (initial_step,))
 
+  timer = ContextTimer(total_steps = num_train_steps + 1 - initial_step)
   for step in range(initial_step, num_train_steps + 1):
     # Convert data to JAX arrays and normalize them. Use ._numpy() to avoid copy.
     batch = next(train_iter).to(config.device).float()
@@ -142,7 +147,7 @@ def train(config, workdir):
     # Execute one training step
     loss = train_step_fn(state, batch)
     if step % config.training.log_freq == 0:
-      logger.info("step: %d, training_loss: %.5e" % (step, loss.item()))
+      logger.info(f"step: {step}, training_loss: {loss.item():.5e}. {timer.stats()}")
       writer.add_scalar("training_loss", loss, step)
 
     # Save a temporary checkpoint to resume training after pre-emption periodically
@@ -169,7 +174,7 @@ def train(config, workdir):
         sample, n = sampling_fn(score_model)
         ema.restore(score_model.parameters())
         this_sample_dir = os.path.join(sample_dir, "iter_{}".format(step))
-        os.makedirs(this_sample_dir)
+        os.makedirs(this_sample_dir, exist_ok=True)
         nrow = int(np.sqrt(sample.shape[0]))
         image_grid = make_grid(sample, nrow, padding=2)
         sample = np.clip(sample.permute(0, 2, 3, 1).cpu().numpy() * 255, 0, 255).astype(np.uint8)
@@ -180,3 +185,9 @@ def train(config, workdir):
         with open(
             os.path.join(this_sample_dir, "sample.png"), "wb") as fout:
           save_image(image_grid, fout)
+
+    timer.update()
+
+
+if __name__ == "__main__":
+  app.run(train)
