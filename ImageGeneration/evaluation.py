@@ -15,7 +15,8 @@
 
 """Utility functions for computing FID/Inception scores."""
 
-import jax
+# import jax
+import torch
 import numpy as np
 import six
 import tensorflow as tf
@@ -121,11 +122,19 @@ def run_inception_distributed(input_tensor,
     A dictionary with key `pool_3` and `logits`, representing the pool_3 and
       logits of the inception network respectively.
   """
-  num_tpus = jax.local_device_count()
-  input_tensors = tf.split(input_tensor, num_tpus, axis=0)
+  num_devices = (
+      torch.cuda.device_count()
+      if torch.cuda.is_available()
+      else 1
+  )
+
+  input_tensors = tf.split(input_tensor, num_devices, axis=0)
+
   pool3 = []
   logits = [] if not inceptionv3 else None
-  device_format = '/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
+
+  # Keep TensorFlow-style device names because tf.device() uses them.
+  device_format = "/GPU:{}" if torch.cuda.is_available() else "/CPU:0"
   for i, tensor in enumerate(input_tensors):
     with tf.device(device_format.format(i)):
       tensor_on_device = tf.identity(tensor)

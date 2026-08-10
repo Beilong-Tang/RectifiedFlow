@@ -97,8 +97,17 @@ def create_model(config):
       num_params += p.numel()
   print('Number of Parameters in the Score Model:', num_params)
 
-  score_model = torch.nn.DataParallel(score_model)
+  # score_model = torch.nn.DataParallel(score_model)
+  score_model = ModelWrapper(score_model).to(config.device)
   return score_model
+
+import torch.nn as nn
+class ModelWrapper(nn.Module):
+  def __init__(self, module):
+    super().__init__()
+    self.module = module
+  def forward(self, *args, **kwargs):
+    return self.module(*args, **kwargs)
 
 
 def get_model_fn(model, train=False):

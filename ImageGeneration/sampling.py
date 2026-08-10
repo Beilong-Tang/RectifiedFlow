@@ -32,6 +32,8 @@ import matplotlib.pyplot as plt
 import torchvision
 from tqdm import tqdm
 
+from blpytorch.utils.dprint import dprint
+
 
 def get_sampling_fn(config, sde, shape, inverse_scaler, eps):
   """Create a sampling function.
@@ -87,6 +89,7 @@ def get_rectified_flow_sampler(sde, shape, inverse_scaler, device='cuda'):
       ### Uniform
       dt = 1./sde.sample_N
       eps = 1e-3 # default: 1e-3
+      dprint(f"# of sample steps: {sde.sample_N}")
       for i in range(sde.sample_N):
         
         num_t = i /sde.sample_N * (sde.T - eps) + eps
